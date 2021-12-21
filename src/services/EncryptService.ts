@@ -1,5 +1,6 @@
 import { getCustomRepository } from 'typeorm';
-import crypto from 'crypto';
+import CryptoJS from 'crypto-js';
+import { customAlphabet } from 'nanoid';
 import { v4 as uuid } from 'uuid';
 import { EncryptRepository } from '../repositories/EncryptRepositories';
 
@@ -8,28 +9,20 @@ export class EncryptService {
     try {
       const encryptRepository = getCustomRepository(EncryptRepository);
 
-      const iv = crypto.randomBytes(16);
+      const key = CryptoJS.enc.Utf8.parse(String(process.env.SECRET));
 
-      console.log('Passou por aqui Antes de criar o cipher');
+      let encrypted = CryptoJS.AES.encrypt(name, key.toString()).toString();
 
-      const cipher = crypto.createCipheriv('aes-256-gcm', String(process.env.SECRET), iv);
-
-      cipher.update(name);
-
-      const encryptedName = cipher.final('hex');
-
-      console.log('Passou por aqui depois de criar o cipher');
-
-      console.log('encryptedName: ', encryptedName.toString());
+      const encryptedName = encrypted;
+      const nanoid = customAlphabet('1234567890abcdef', 6);
+      const id = nanoid();
 
       const encrypt = encryptRepository.create({
-        id: uuid(),
+        id,
         name: encryptedName,
       });
 
       await encryptRepository.save(encrypt);
-
-      console.log('Passou por aqui depois de salvar o cipher');
 
       return encrypt;
     } catch (err: any) {
@@ -47,15 +40,11 @@ export class EncryptService {
         return;
       }
 
-      const iv = crypto.randomBytes(16);
+      const key = CryptoJS.enc.Utf8.parse(String(process.env.SECRET));
 
-      const decipher = crypto.createDecipheriv('aes-256-cbc', 'secret', iv);
+      const decrypted = CryptoJS.AES.decrypt(encrypt.name, key.toString()).toString(CryptoJS.enc.Utf8);
 
-      decipher.update(encrypt.name, 'hex');
-
-      const decryptedName = decipher.final('utf8');
-
-      return { id: encrypt.id, encrypted_name: decryptedName };
+      return { id: encrypt.id, encrypted_name: decrypted };
     } catch (err: any) {
       throw new Error(err.message);
     }
